@@ -1,0 +1,534 @@
+##NMDS plots
+abund_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Transpose the data to have sample names on rows
+abund_table<-t(abund_table)
+#meta_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Just a check to ensure that the samples in meta_table are in the same order as in abund_table
+#meta_table<-meta_table[rownames(abund_table),]
+#Get grouping information
+grouping_info<-data.frame(row.names=rownames(abund_table),t(as.data.frame(strsplit(rownames(abund_table),"_"))))
+library(vegan)
+#Get MDS stats
+sol<-metaMDS(abund_table,distance = "bray", k = 2, trymax = 50)
+ 
+#Make a new data frame, and put month, site, and sample_type information there, to be useful for coloring, and shape of points
+NMDS=data.frame(x=sol$point[,1],y=sol$point[,2],Sample=as.factor(grouping_info[,1]),Retrieval=as.factor(grouping_info[,2]),Retrieval_Type=as.factor(grouping_info[,3]))
+#Get spread of points based on site
+plot.new()
+ord<-ordiellipse(sol, as.factor(grouping_info[,2]) ,display = "sites", kind ="sd", conf = 0.95, label = T)
+dev.off()
+#Data frame df_ell contains values to show ellipses. It is calculated with function veganCovEllipse which is hidden in vegan package. This function is applied to each level of NMDS (group) and it uses also function cov.wt to calculate covariance matrix.
+veganCovEllipse<-function (cov, center = c(0, 0), scale = 1, npoints = 100) 
+{
+  theta <- (0:npoints) * 2 * pi/npoints
+  Circle <- cbind(cos(theta), sin(theta))
+  t(center + scale * t(Circle %*% chol(cov)))
+}
+ 
+#Generate ellipse points
+df_ell <- data.frame()
+for(g in levels(NMDS$Retrieval)){
+  if(g!="" && (g %in% names(ord))){
+ 
+    df_ell <- rbind(df_ell, cbind(as.data.frame(with(NMDS[NMDS$Retrieval==g,],
+                                                     veganCovEllipse(ord[[g]]$cov,ord[[g]]$center,ord[[g]]$scale)))
+                                  ,Sample_Type=g), multivariate=FALSE)
+  }
+}
+#Generate mean values from NMDS plot grouped on months
+NMDS.mean=aggregate(NMDS[,1:2],list(group=NMDS$Retrieval),mean)
+#Now do the actual plotting
+library(ggplot2)
+ 
+shape_values<-seq(1,11)
+ 
+p<-ggplot(data=NMDS,aes(x,y,colour=Retrieval))+theme(text=element_text(size=16))+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("NMDS Coordinate Analysis")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+#p<-p+ annotate("text",x=NMDS.mean$x,y=NMDS.mean$y,label=NMDS.mean$group,size=6)
+p<-p+ geom_path(data=df_ell, aes(x=NMDS1, y=NMDS2), size=2, linetype=2)
+p<-p+geom_point(aes(), size=2)
+#+geom_polygon(aes(fill=Sample_Type))
+p
+pdf("NMDS_hurricane_3_retrievals_dna.pdf")
+print(p)
+dev.off()
+
+
+##ANOSIM test
+abund_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Transpose the data to have sample names on rows
+abund_table<-t(abund_table)
+#meta_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Just a check to ensure that the samples in meta_table are in the same order as in abund_table
+#meta_table<-meta_table[rownames(abund_table),]
+#Get grouping information
+grouping_info<-data.frame(row.names=rownames(abund_table),t(as.data.frame(strsplit(rownames(abund_table),"_"))))
+library(vegan)
+#Get MDS stats
+sol<-metaMDS(abund_table,distance = "bray", k = 2, trymax = 50)
+
+#make community matrix - extract columns with abundance information, turn data frame into matrix
+com = abund_table[,4:ncol(abund_table)]
+m_com = as.matrix(com)
+ano = anosim(m_com, grouping_info[,2], distance = "bray", permutations = 9999)
+ano
+
+##PERMANOVA
+abund_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Transpose the data to have sample names on rows
+abund_table<-t(abund_table)
+#meta_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Just a check to ensure that the samples in meta_table are in the same order as in abund_table
+#meta_table<-meta_table[rownames(abund_table),]
+#Get grouping information
+grouping_info<-data.frame(row.names=rownames(abund_table),t(as.data.frame(strsplit(rownames(abund_table),"_"))))
+library(vegan)
+abund_frame<-data.frame(abund_table)
+hurricane.dist<-data.matrix(vegdist(abund_frame, method='bray'))
+hurricane.div<-adonis2(hurricane.dist~grouping_info[,3], data=hurricane.dist, permutations = 999, method="bray", strata="PLOT")
+hurricane.div
+
+
+##Taxa plot
+abund_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Transpose the data to have sample names on rows
+abund_table<-t(abund_table)
+#meta_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Just a check to ensure that the samples in meta_table are in the same order as in abund_table
+#meta_table<-meta_table[rownames(abund_table),]
+#Get grouping information
+grouping_info<-data.frame(row.names=rownames(abund_table),t(as.data.frame(strsplit(rownames(abund_table),"_"))))
+#Apply proportion normalisation
+x<-abund_table/rowSums(abund_table)
+x<-x[,order(colSums(x),decreasing=TRUE)]
+ 
+#Extract list of top N Taxa
+N<-26
+taxa_list<-colnames(x)[1:N]
+#remove "__Unknown__" and add it to others
+taxa_list<-taxa_list[!grepl("Unknown",taxa_list)]
+N<-length(taxa_list)
+ 
+#Generate a new table with everything added to Others
+new_x<-data.frame(x[,colnames(x) %in% taxa_list],Others=rowSums(x[,!colnames(x) %in% taxa_list]))
+ 
+ 
+#You can change the Type=grouping_info[,1] should you desire any other grouping of panels
+df<-NULL
+for (i in 1:dim(new_x)[2]){
+  tmp<-data.frame(row.names=NULL,Sample=rownames(new_x),Taxa_Class=rep(colnames(new_x)[i],dim(new_x)[1]),Value=new_x[,i],Type=grouping_info[,1])
+  if(i==1){df<-tmp} else {df<-rbind(df,tmp)}
+}
+colours <- c("#F0A3FF", "#0075DC", "#993F00","#4C005C","#2BCE48","#FFCC99","#808080","#94FFB5","#8F7C00","#9DCC00","#C20088","#003380","#FFA405","#FFA8BB","#426600","#FF0010","#5EF1F2","#00998F","#740AFF","#990000","#FFFF00","#FF6666","#00FF00","#6666CC","#99CCCC","#0000FF");
+ 
+#more colors newnew- ,"#FF6666","#00FF00","#0000FF"
+#more colors- "#F0A3FF", "#0075DC", "#993F00","#4C005C","#2BCE48","#FFCC99","#808080","#94FFB5","#8F7C00","#9DCC00","#C20088","#003380","#FFA405", 
+library(ggplot2)
+p<-ggplot(df,aes(Sample,Value,fill=Taxa_Class))+geom_bar(stat="identity")+facet_grid(. ~ Type, drop=TRUE,scale="free",space="free_x")
+p<-p+scale_fill_manual(values=colours[1:(N+1)])
+p<-p+theme_bw()+ylab("Proportions")
+p<-p+ scale_y_continuous(expand = c(0,0))+theme(strip.background = element_rect(fill="gray85"))+theme(panel.margin = unit(0.3, "lines"))
+p<-p+theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+p
+#pdf("hurricane1DNA_and_RNA_sediment_genus_only_for_taxaplot.pdf",height=6,width=21)
+#print(p)
+#dev.off()
+
+
+
+##CCA plot
+library(ggplot2)
+library(vegan)
+library(grid)
+library(patchwork)
+abund_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Transpose the data to have sample names on rows
+abund_table<-t(abund_table)
+meta_table<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Just a check to ensure that the samples in meta_table are in the same order as in abund_table
+meta_table<-meta_table[rownames(abund_table),]
+
+ 
+#Filter out any samples taxas that have zero entries 
+#abund_table<-subset(abund_table,rowSums(abund_table)!=0)
+ 
+#Convert to relative frequencies
+abund_table<-abund_table/rowSums(abund_table)
+ 
+#Use adonis to find significant environmental variables
+abund_table.adonis <- adonis(abund_table ~ ., data=meta_table)
+
+#Call:
+#  adonis(formula = abund_table ~ ., data = meta_table) 
+#Permutation: free
+#Number of permutations: 999
+#
+#Terms added sequentially (first to last)
+#
+#Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
+#pH          1    0.2600 0.26002  2.1347 0.01974  0.067 .  
+#Temp        1    1.6542 1.65417 13.5806 0.12559  0.001 ***
+#TS          1    0.8298 0.82983  6.8128 0.06300  0.001 ***
+#VS          1    0.3143 0.31434  2.5807 0.02387  0.038 *  
+#VFA         1    0.2280 0.22796  1.8715 0.01731  0.109    
+#CODt        1    0.1740 0.17400  1.4285 0.01321  0.209    
+#CODs        1    0.0350 0.03504  0.2877 0.00266  0.909    
+#perCODsbyt  1    0.1999 0.19986  1.6409 0.01517  0.148    
+#NH4         1    0.1615 0.16154  1.3262 0.01226  0.236    
+#Prot        1    0.3657 0.36570  3.0024 0.02777  0.024 *  
+#Carbo       1    0.5444 0.54439  4.4693 0.04133  0.003 ** 
+#Residuals  69    8.4045 0.12180         0.63809           
+#Total      80   13.1713                 1.00000           
+#---
+#  Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+ 
+#Extract the best variables
+bestEnvVariables<-rownames(abund_table.adonis$aov.tab)[abund_table.adonis$aov.tab$"Pr(>F)"<=0.01]
+ 
+#Last two are NA entries, so we have to remove them
+bestEnvVariables<-bestEnvVariables[!is.na(bestEnvVariables)]
+ 
+#We are now going to use only those environmental variables in cca that were found significant
+#eval(parse(text=paste("sol <- cca(abund_table ~ ",do.call(paste,c(as.list(bestEnvVariables),sep=" + ")),",data=meta_table)",sep="")))
+ 
+#You can use the following to use all the environmental variables
+sol<-cca(abund_table ~ ., data=meta_table)
+ 
+scrs<-scores(sol,display=c("sp","wa","lc","bp","cn"))
+ 
+#Check the attributes
+#attributes(scrs)
+# $names
+# [1] "species"     "sites"       "constraints" "biplot"     
+# [5] "centroids"  
+ 
+#Extract site data first
+df_sites<-data.frame(scrs$sites,t(as.data.frame(strsplit(rownames(scrs$sites),"_"))))
+colnames(df_sites)<-c("x","y","SampleID","Total_vs_Active","Condition")
+ 
+#Draw sites
+p<-ggplot()
+p<-p+geom_point(data=df_sites,aes(x,y,colour=Condition,shape=Total_vs_Active,size=20))+ guides(colour = guide_legend(override.aes = list(size=10)))
+ 
+#Draw biplots
+multiplier <- vegan:::ordiArrowMul(scrs$biplot)
+ 
+# Reference: http://www.inside-r.org/packages/cran/vegan/docs/envfit
+# The printed output of continuous variables (vectors) gives the direction cosines 
+# which are the coordinates of the heads of unit length vectors. In plot these are 
+# scaled by their correlation (square root of the column r2) so that "weak" predictors 
+# have shorter arrows than "strong" predictors. You can see the scaled relative lengths 
+# using command scores. The plotted (and scaled) arrows are further adjusted to the 
+# current graph using a constant multiplier: this will keep the relative r2-scaled 
+# lengths of the arrows but tries to fill the current plot. You can see the multiplier 
+# using vegan:::ordiArrowMul(result_of_envfit), and set it with the argument arrow.mul. 
+ 
+df_arrows<- scrs$biplot*multiplier
+colnames(df_arrows)<-c("x","y")
+df_arrows=as.data.frame(df_arrows)
+ 
+p<-p+geom_segment(data=df_arrows, aes(x = 0, y = 0, xend = x, yend = y),
+                 arrow = arrow(length = unit(0.5, "cm")),color=c("#808080","#993F00","#003380","#FFA405"),alpha=0.75,size=2)
+ # colors= "#993F00"=brown "#003380" = navy "#FFA405" = orange
+#s<-s+geom_text(data=as.data.frame(df_arrows*1.1),aes(x, y, label = rownames(df_arrows)),color="#808080",alpha=0.5)
+ 
+# Draw species
+df_species<- as.data.frame(scrs$species)
+colnames(df_species)<-c("x","y")
+ 
+# Either choose text or points
+#p<-p+geom_text(data=df_species,aes(x,y,label=rownames(df_species)))
+#p<-p+geom_point(data=df_species,aes(x,y,shape="Species"))+scale_shape_manual("",values=2)
+ 
+p<-p+theme_bw()
+p<-p+theme(text=element_text(size=28))+ggtitle("Bacteria Sediment")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))+
+  xlab("CCA1")+
+  ylab("CCA2")
+pdf("CCA_hurricane_3_retrievals_DNA_vs_RNA_subplot_new_arrows_shapes.pdf",width=18,height=13.5)
+#print(q)
+print(((q | p)/(r | s)) + plot_layout(guides = 'collect'))
+dev.off()
+abund_table.adonis
+p
+
+
+##diversity indices value generating (preliminary analysis steps)
+library(vegan)
+otu_table<-read.csv(">path_to_file<.csv",header=T,row.names=1,check.names=FALSE)
+#Transpose the data to have sample names on rows
+otu_table<-t(otu_table)
+data(otu_table)
+H<-diversity(otu_table)
+simp<-diversity(otu_table, "simpson")
+invsimp<-diversity(otu_table, "inv")
+## Unbiased Simpson (Hurlbert 1971, eq. 5) with rarefy:
+unbias.simp <- rarefy(otu_table, 2) - 1
+## Fisher alpha
+alpha <- fisher.alpha(otu_table)
+## Species richness (S) and Pielou's evenness (J):
+S <- specnumber(otu_table)
+J <- H/log(S)
+## Plot all
+pairs(cbind(H, simp, invsimp, unbias.simp, alpha), pch="+", col="blue")
+alpha
+write.table(S, "/Users/codygarrison/Desktop/hurricane_richness_archaea_only.txt", sep="\t")
+
+
+##Boxplots of diversity indices values
+library(patchwork)
+library(tidyverse)
+library(dplyr)
+fisher_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+simp_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+unbias_simp_boxplot_data<-read.csv(">path_to_file<csv",row.names=1,check.names=FALSE)
+invsimp_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+shannon_boxplot_data_rna<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+richness_boxplot_data_rna<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+pielou_boxplot_data_rna<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+shannon_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+richness_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+pielou_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+
+a<- fisher_boxplot_data%>% 
+  mutate(Year = as.factor(Year))%>%
+  ggplot(mapping=aes(x=Sample_Type,y=Alpha_Diversity,fill=Year,shape=Salinity))+theme(text=element_text(size=16))+
+  geom_boxplot()+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("Fisher Alpha Diversity")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+a<-a+geom_point(aes(), size=2)
+a<-a+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+#b<-ggplot(data=simp_boxplot_data,aes(x=Sample_Type,y=Alpha_Diversity))+theme(text=element_text(size=16))+
+#  geom_boxplot()+
+#  ggtitle("Simpsons")+
+#  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+#b<-b+geom_point(aes(), size=2)
+#b<-b+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+#c<-ggplot(data=unbias_simp_boxplot_data,aes(x=Sample_Type,y=Alpha_Diversity))+theme(text=element_text(size=16))+
+#  geom_boxplot()+
+#  ggtitle("Unbiased Simpsons")+
+#  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+#c<-c+geom_point(aes(), size=2)
+#c<-c+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+#d<-ggplot(data=invsimp_boxplot_data,aes(x=Sample_Type,y=Alpha_Diversity))+theme(text=element_text(size=16))+
+#  geom_boxplot()+
+#  ggtitle("Inverse Simpsons")+
+#  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+#d<-d+geom_point(aes(), size=2)
+#d<-d+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+e<- shannon_boxplot_data%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=Sample_Type,y=Alpha_Diversity,fill=Condition,shape=Site))+theme(text=element_text(size=16))+
+  geom_boxplot()+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("Shannon Diversity DNA")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+e<-e+geom_point(aes(), size=2)
+e<-e+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+f<- richness_boxplot_data%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=Sample_Type,y=Alpha_Diversity,fill=Condition,shape=Site))+theme(text=element_text(size=16))+
+  geom_boxplot()+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("Species Richness DNA")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+f<-f+geom_point(aes(), size=2)
+f<-f+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+g<- pielou_boxplot_data%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=Sample_Type,y=Alpha_Diversity,fill=Condition,shape=Site))+theme(text=element_text(size=16))+
+  geom_boxplot()+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("Pielou's Evenness DNA")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+g<-g+geom_point(aes(), size=2)
+g<-g+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+h<- shannon_boxplot_data_rna%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=Sample_Type,y=Alpha_Diversity,fill=Condition,shape=Site))+theme(text=element_text(size=16))+
+  geom_boxplot()+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("Shannon Diversity RNA")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+h<-h+geom_point(aes(), size=2)
+h<-h+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+i<- richness_boxplot_data_rna%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=Sample_Type,y=Alpha_Diversity,fill=Condition,shape=Site))+theme(text=element_text(size=16))+
+  geom_boxplot()+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("Species Richness RNA")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+i<-i+geom_point(aes(), size=2)
+i<-i+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+j<- pielou_boxplot_data_rna%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=Sample_Type,y=Alpha_Diversity,fill=Condition,shape=Site))+theme(text=element_text(size=16))+
+  geom_boxplot()+
+  xlab(" ")+
+  ylab(" ")+
+  ggtitle("Pielou's Evenness RNA")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+j<-j+geom_point(aes(), size=2)
+j<-j+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))
+
+
+#(a | b | c)/ (d | e | f | g)
+pdf("Hurricane_Diversity_indices_select3_RNA_DNA_comparison_new_labels.pdf",width=16,height=14)
+#print((a | b | c)/ (d | e | f | g))
+print(((f | g | e)/(i | j | h)) + plot_layout(guides = 'collect'))
+dev.off()
+
+
+
+##pathogenic boxplots
+library(ggplot2)
+hurricane_box=read.csv(">path_to_file<.csv")
+
+
+
+p<-hurricane_box%>% 
+  mutate(Retrieval = as.factor(Retrieval))%>%
+  ggplot(mapping=aes(x=Retrieval,y=Percent_Abundance, fill=Taxa))+geom_boxplot(size=1,outlier.size = 1)+
+   xlab(" ")+
+  ylab("Percent Relative Abundance")
+ 
+p<-p+geom_point(aes(), size=2,position = position_jitterdodge())
+p<-p+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))+
+  theme(text=element_text(size=14))
+
+
+pdf("Pathogenic_taxa_boxplot_updated_new_labels.pdf")
+print(p)
+dev.off()
+
+
+##plots of lignin genes
+library(patchwork)
+library(tidyverse)
+library(dplyr)
+lignin_gene_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+lignin_gene_t=read.csv(">path_to_file<.csv")
+
+p=ggplot(data=lignin_gene_boxplot_data,aes(x=Year,y=Total_Lignin_Gene_Percent_Abundance))+geom_boxplot(size=2,outlier.size = 2)+theme(text=element_text(size=14))
+p<-p+geom_point(aes(), size=4)
+#p
+
+
+q<-lignin_gene_boxplot_data%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=Salinity,y=Total_Lignin_Gene_Percent_Abundance, colour=Condition,shape=Sample_Type))+
+   xlab("Salinity")+
+  ylab("Lignin Gene Percent Relative Abundance")
+ 
+q<-q+geom_point(aes(),size=4)
+q<-q+theme(text=element_text(size=14))
+
+#+
+#  geom_smooth(method = "lm", se = FALSE, size=3)
+
+
+
+#Wilcox test
+wilcox.test(gene~group, data=lignin_gene_t) 
+
+pdf("Hurricane_lignin_gene_abundance_updated_genbank_across_salinity_new_labels.pdf")
+print(q)
+dev.off()
+
+
+##Boxplots of rrn copy number
+library(patchwork)
+library(tidyverse)
+library(dplyr)
+copy_number_boxplot_data<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+
+p<-copy_number_boxplot_data%>% 
+  mutate(Condition = as.factor(Condition))%>%
+  ggplot(mapping=aes(x=id,y=avg_rrn_copy_number, fill=Condition, shape=Site))+geom_boxplot(size=1,outlier.size = 1)+
+   xlab(" ")+
+  ylab("Average rRNA Copy Number")
+ 
+p<-p+geom_point(aes(), size=2)
+p<-p+theme(axis.text.x=element_text(angle=70,vjust=0.99,hjust=1))+
+  theme(text=element_text(size=14))
+
+
+pdf("Hurricane_copy_number_boxplot_with_points_new_labels.pdf")
+print(p)
+dev.off()
+
+#paired wilcox
+copy_number_t=read.csv(">path_to_file<.csv")
+#glm_new<-glm(Percent_Abundance~Retrieval,family="poisson",data=hurricane_t)
+#summary(glm_new)
+#plot(glm_new)
+# independent 2-group Mann-Whitney U Test for non-normal distributions
+wilcox.test(avg_rrn_copy_number~group, data=copy_number_t)
+
+
+##SIMPER
+library(vegan)
+OTU.clean<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+#Transpose the data to have sample names on rows
+OTU.clean<-t(OTU.clean)
+meta<-read.csv(">path_to_file<.csv",row.names=1,check.names=FALSE)
+
+simp<-simper(OTU.clean, meta$Group, permutations = 100)
+summary(simp)
+
+
+##hurricane condition water vs sediment 1:1 community composition analysis
+comm_comp=read.csv(">path_to_file<.csv")
+
+
+library(tidyverse)
+
+
+p=ggplot(data = comm_comp,aes(x = sediment_taxa_percent_average,y = water_taxa_percent_avg, colour=Class))+
+ geom_errorbar(aes(ymin=water_taxa_percent_avg-water_taxa_percent_SD, ymax=water_taxa_percent_avg+water_taxa_percent_SD), width=.2, size=1.2) + theme(text=element_text(size=10)) +
+  
+  geom_errorbarh(aes(xmin=sediment_taxa_percent_average-sediment_taxa_percent_SD, xmax=sediment_taxa_percent_average+sediment_taxa_percent_SD), height=.2, size=1.2) + theme(text=element_text(size=6)) +
+  xlab("Sediment Taxa Percent Abundance")+
+  ylab("Water Column Taxa Percent Abundance")+
+#  ggtitle("Hurricane Season Sediment vs Water Column Community Composition Analysis Class Level")+
+#  theme(plot.title = element_text(hjust = 0.5,face="bold")) + 
+    geom_point(aes(), size=7) +
+    
+  geom_abline(intercept = 0, slope = 1,size=1,linetype = "dashed") 
+p=p+theme(text=element_text(size=28))
+p=p + scale_color_manual(values=c("#F0A3FF", "#0075DC", "#993F00","#4C005C","#2BCE48","#FFCC99","#808080","#94FFB5","#8F7C00","#9DCC00","#C20088","#003380","#FFA405","#FFA8BB","#426600","#FF0010","#5EF1F2","#00998F","#740AFF","#990000","#FFFF00","#FF6666","#00FF00","#6666CC","#99CCCC","#0000FF"))
+#for class level 1:1 plot, 16th color removed for consistency with class level taxa plot (,"#FF0010")
+p
+pdf("1_to_1_hurricane_sediment_vs_water_comm_comp_class_level.pdf",height=10,width=20)
+print(p)
+dev.off()
