@@ -1,0 +1,154 @@
+#Initial data visualization of salinity and steel type effects
+library(tidyverse)
+corrosion=read.csv(">path_to_file<")
+head(corrosion)
+ggplot(data=corrosion,aes(x=salinity,y=cells,color=steel))+geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+ggplot(data=corrosion,aes(x=site,y=cells))+geom_boxplot(size=2)
+glm1<-glm(cells~salinity*steel,family="poisson",data=corrosion)
+summary(glm1)
+require(MASS)
+glm2<-glm.nb(cells~salinity*steel,data=corrosion)
+summary(glm2)
+
+e0 <- resid(glm2)
+f0 <- fitted(glm2)
+
+##make residuals plot
+resid_plot=tibble(e0=resid(glm2),f0=fitted(glm2))
+r1=ggplot(resid_plot,aes(x = f0,y = e0))+geom_point()+
+  xlab("Fitted values")+
+  ylab("Residuals")+
+  geom_hline(yintercept =0)
+r1
+plot(glm2)
+R2<-cor(corrosion$cells,predict(glm2))^2
+R2linear<-cor(corrosion$cells,predict(glm1))^2
+lm1<-lm(cells~salinity*steel,data=corrosion)
+summary(lm1)
+
+#Log transformation
+logy<-log1p(corrosion$cells)
+ggplot(data=corrosion,aes(x=salinity,y=logy,color=steel))+geom_point(size=2) +
+  geom_smooth(method = "lm", se = FALSE,size=2)+
+  theme(text=element_text(size=18,face="bold"))
+glm_new<-glm(logy~salinity+steel,family="poisson",data=corrosion)
+summary(glm_new)
+plot(glm_new)
+glm_new2<-glm(logy~temp+steel,family="poisson",data=corrosion)
+summary(glm_new2)
+ggplot(data=corrosion,aes(x=temp,y=cells,color=steel))+geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+  
+#Test for dispersion of the data
+N=nrow(corrosion)
+P=length(coef(glm2))
+e1=resid(glm2,type="pearson")
+Dispersion=sum(e1^2)/(N-P)
+Dispersion
+
+###Dissoved oxygen analysis
+library(tidyverse)
+corrosion=read.csv(">path_to_file<")
+head(corrosion)
+ggplot(data=corrosion,aes(x=DO,y=cells,color=steel))+geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+glm1<-glm(cells~DO+steel,family="poisson",data=corrosion)
+summary(glm1)
+
+logy<-log1p(corrosion$cells)
+ggplot(data=corrosion,aes(x=DO,y=logy,color=steel))+geom_point(size=2) +
+  geom_smooth(method = "lm", se = FALSE,size=2)+
+  theme(text=element_text(size=18,face="bold"))
+glm_new<-glm(logy~DO+steel,family="poisson",data=corrosion)
+summary(glm_new)
+plot(glm_new)
+ggplot(data=corrosion,aes(x=DO,y=cells,color=steel))+geom_point(shape=15,size=5)+
+  theme(text=element_text(size=24,face="bold"))
+ggplot(data=corrosion,aes(x=temp,y=cells,color=steel))+geom_point(shape=17,size=5)+
+  theme(text=element_text(size=24,face="bold"))
+ggplot(data=corrosion,aes(x=salinity,y=cells,color=steel))+geom_point(shape=16,size=4)+
+  theme(text=element_text(size=18,face="bold"))
+  
+###single site plots
+library(ggplot2)
+matthewspoint=read.csv(">path_to_file<")
+northcreek=read.csv(">path_to_file<")
+wrightscreek=read.csv(">path_to_file<")
+cedarisland=read.csv(">path_to_file<")
+#p1<-ggplot(data=matthewspoint,aes(x=retrieval,y=cells,fill=steel))+geom_bar(stat='identity',position=position_dodge(),size=1, color='black')
+#p1
+#p2<-plot_ly(matthewspoint, x = ~Retrieval_Month, y= ~FeOB_Cells, color = ~Steel, type = "bar")%>%
+  #layout(
+    #title = "Matthew's Point")
+#p2
+p3<-ggplot(data=matthewspoint,aes(x=Retrieval_Month,y=FeOB_Cells,fill=Steel))+geom_bar(stat='identity',position=position_dodge(),size=1, color='black')+theme(text=element_text(size=16))+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5))+
+  xlab("Retrieval Month ")+
+  ylab("FeOB Cells ")+
+  ggtitle("Matthew's Point")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+#p3
+p4<-ggplot(data=northcreek,aes(x=retrieval,y=cells,fill=Steel))+geom_bar(stat='identity',position=position_dodge(),size=1, color='black')+theme(text=element_text(size=16))+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5))+
+  xlab("Retrieval Month ")+
+  ylab("FeOB Cells ")+
+  ggtitle("North Creek")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+#p4
+p5<-ggplot(data=wrightscreek,aes(x=retrieval,y=cells,fill=Steel))+geom_bar(stat='identity',position=position_dodge(),size=1, color='black')+theme(text=element_text(size=16))+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5))+
+  xlab("Retrieval Month ")+
+  ylab("FeOB Cells ")+
+  ggtitle("Wright's Creek")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+#p5
+p6<-ggplot(data=cedarisland,aes(x=retrieval,y=cells,fill=Steel))+geom_bar(stat='identity',position=position_dodge(),size=1, color='black')+theme(text=element_text(size=16))+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5))+
+  xlab("Retrieval Month ")+
+  ylab("FeOB Cells ")+
+  ggtitle("Cedar Island")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+#p6
+multiplot(p3, p4, p5, p6, cols=2)
+
+###Exploratory exponential fit predictive plot of salinity and steel type
+newdata_1 <- data.frame(salinity=rep(seq(from= range(corrosion$salinity)[1],
+                                    to=range(corrosion$salinity)[2],
+                                    length= 50),2),
+                      steel = factor(rep(c("304-SS","316-SS"),each=50)))
+newdata2 <- cbind(newdata_1, predict(glm2, newdata_1, type = "link", se.fit=TRUE))
+ newdata2<- within(newdata2, {
+  predvals <- exp(fit)
+  LL <- exp(fit - 1.96 * se.fit)
+  UL <- exp(fit + 1.96 * se.fit)
+})
+
+pc<-ggplot(data=newdata2,aes(x=salinity,y=predvals,color=steel,group=steel))+
+  geom_point(data=corrosion,aes(x = salinity,y = cells,color=steel,group=steel),position=position_jitter(h=0.1, w=0.1), alpha = 0.5, size = 3)+ggtitle("Steel Type Comparison")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold",size=24))+
+  xlab("Salinity")+theme(text=element_text(size=16,face="bold"))+
+  ylab("FeOB Cells/Sample")+theme(text=element_text(size=16,face="bold"))+
+  geom_line(data=newdata2,aes(x=salinity,y=predvals,group=steel))+
+  geom_ribbon(data=newdata2,aes(ymin=LL,ymax=UL,group=steel,fill=steel),alpha=.2)
+pdf("test.pdf",width=9,height=8)
+print(pc)
+dev.off()
+ggsave("test.tiff", units="in", width=6, height=4, dpi=300, compression = 'lzw')
+ggplot(data=newdata2,aes(x=salinity,y=predvals,color=steel,group=steel))+
+
+  xlab("Salinity")+
+  ylab("Cells/sample")+
+  labs(title="FeOB Environmental Abundance")+
+  geom_line(data=newdata2,aes(x=salinity,y=predvals,group=steel))+
+  geom_ribbon(data=newdata2,aes(ymin=LL,ymax=UL,group=steel,fill=steel),alpha=.2)
+  
+#T tests
+library(tidyverse)
+corrosion=read.csv(">path_to_file<")
+t.test(cells ~ group, data = corrosion)
+
+steel=read.csv(">path_to_file<")
+t.test(cells ~ group, data = steel)
+  
