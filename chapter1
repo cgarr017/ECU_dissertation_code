@@ -152,3 +152,32 @@ t.test(cells ~ group, data = corrosion)
 steel=read.csv(">path_to_file<")
 t.test(cells ~ group, data = steel)
   
+#Coupon salinity logger plots
+library(tidyverse)
+salinity=read.csv(">path_to_file<")
+head(salinity)
+ggplot(data=salinity,aes(x=time,y=sal))+geom_point()+
+  theme(text=element_text(size=16))+
+  xlab("Time")+
+  ylab("Salinity")+
+  ggtitle("Cedar Island Salinity Logger Measurements")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+ggplot(data=salinity,aes(x=time,y=temp))+geom_point()
+
+
+corrosion=read.csv(">path_to_file<")
+head(corrosion)
+ggplot(data=corrosion,aes(x=temp,y=cells,color=steel))+geom_point(shape=17, size=3)+
+  theme(text=element_text(size=16))+
+  xlab("Temperature (Celsius)")+
+  ylab("FeOB Cells/Coupon")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
+
+salinity=read.csv(">path_to_file<")
+head(salinity)
+ggplot(data=salinity,aes(x=time,y=sal))+geom_point()+
+  theme(text=element_text(size=16))+
+  xlab("Time")+
+  ylab("Salinity")+
+  ggtitle("Mallard Creek Salinity Logger Measurements")+
+  theme(plot.title = element_text(hjust = 0.5,face="bold"))
